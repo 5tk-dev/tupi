@@ -92,7 +92,7 @@ Roadmap
 
 - [ ] Mais validadores built-in (regex, min/max length, etc).
 - [ ] Melhor suporte a internacionalização de erros.
-- [ ] Benchmarks comparativos com go-playground/validator.
+- [ ] Benchmarks
 
 ---
 
