@@ -7,58 +7,51 @@ import (
 )
 
 func TestMapsStringString(t *testing.T) {
-	var m1 = map[string]string{}
-	var m2 = tupi.Validate(m1, map[any]any{"hello": "world"})
-	if m2.HasErrors() {
-		t.Error(m2.Errors())
+	// var m1 = map[string]string{}
+	var m = tupi.Validate[map[string]string](map[any]any{"hello": "world"})
+	if m.HasErrors() {
+		t.Error(m.Errors())
 	}
-	h := m2.Value().(map[string]string)["hello"]
-	if h != "world" {
+	if h := m.Value()["hello"]; h != "world" {
 		t.Errorf("TestMapString got %q, want %q", h, "world")
 	}
 }
 
 func TestMapsStringInt(t *testing.T) {
-	var m1 = map[string]int{}
-	var m2 = tupi.Validate(m1, map[any]any{"int": "1"})
-	if m2.HasErrors() {
-		t.Error(m2.Errors())
+	var m = tupi.Validate[map[string]int](map[any]any{"int": "1"})
+	if m.HasErrors() {
+		t.Error(m.Errors())
 	}
 
-	h := m2.Value().(map[string]int)["int"]
-	if h != 1 {
+	if h := m.Value()["int"]; h != 1 {
 		t.Errorf("TestMapString got %q, want %q", h, 1)
 	}
 }
 
 func TestMapsStringFloat32(t *testing.T) {
-	var m1 = map[string]float32{}
-	var m2 = tupi.Validate(m1, map[any]any{"float": "1.123"})
-	if m2.HasErrors() {
-		t.Error(m2.Errors())
+	var m = tupi.Validate[map[string]float32](map[any]any{"float": "1.123"})
+	if m.HasErrors() {
+		t.Error(m.Errors())
 	}
 
-	h := m2.Value().(map[string]float32)["float"]
+	h := m.Value()["float"]
 	if h != 1.123 {
 		t.Errorf("TestMapString got %v, want %v", h, 1.123)
 	}
 }
 
 func TestMapsStringBool(t *testing.T) {
-	var m1 = map[string]bool{}
-	var m2 = tupi.Validate(m1, map[any]any{"bool": true})
-	if m2.HasErrors() {
-		t.Error(m2.Errors())
+	var m = tupi.Validate[map[string]bool](map[any]any{"bool": true})
+	if m.HasErrors() {
+		t.Error(m.Errors())
 	}
 
-	h, ok := m2.Value().(map[string]bool)["bool"]
-	if !ok {
+	if h, ok := m.Value()["bool"]; !ok {
 		t.Errorf("TestMapString got %v, want %v", h, true)
 	}
 }
 
 func TestMapsStringStruct(t *testing.T) {
-	var m1 = map[string]*UserTest{}
 	var data = map[any]any{
 		"1": &UserTest{Name: "etho"},
 		"2": &UserTest{Name: "etho2"},
@@ -67,14 +60,32 @@ func TestMapsStringStruct(t *testing.T) {
 		"5": &UserTest{Name: "etho5"},
 		"6": &UserTest{Name: "etho6"},
 	}
-	var m2 = tupi.Validate(m1, data)
+	var m = tupi.Validate[map[string]*UserTest](data)
 
-	if m2.HasErrors() {
-		t.Error(m2.Errors())
+	if m.HasErrors() {
+		t.Error(m.Errors())
 	}
 
-	m3 := m2.Value().(map[string]*UserTest)
+	m3 := m.Value()
 	if len(m3) != 6 {
 		t.Errorf("TestMapString got %v, want %v", m3, data)
+	}
+	if m3["1"].Name != "etho" {
+		t.Errorf("TestMapString['1'] got %v, want %v", m3["1"], data)
+	}
+	if m3["2"].Name != "etho2" {
+		t.Errorf("TestMapString['2'] got %v, want %v", m3["2"], data)
+	}
+	if m3["3"].Name != "etho3" {
+		t.Errorf("TestMapString['3'] got %v, want %v", m3["3"], data)
+	}
+	if m3["4"].Name != "etho4" {
+		t.Errorf("TestMapString['4'] got %v, want %v", m3["4"], data)
+	}
+	if m3["5"].Name != "etho5" {
+		t.Errorf("TestMapString['5'] got %v, want %v", m3["5"], data)
+	}
+	if m3["6"].Name != "etho6" {
+		t.Errorf("TestMapString['6'] got %v, want %v", m3["6"], data)
 	}
 }

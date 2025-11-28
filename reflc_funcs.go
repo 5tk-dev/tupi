@@ -21,30 +21,26 @@ func convert(v *reflect.Value, t reflect.Type) bool {
 				return false
 			}
 			*v = reflect.ValueOf(i).Convert(t)
-		case
+		case reflect.Float32, reflect.Float64, // 64 -> 32 || 32 -> 64
 			reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8,
 			reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
-			*v = v.Convert(t)
-		case reflect.Float32, reflect.Float64:
 			*v = v.Convert(t)
 		default:
 			return false
 		}
-	case
-		reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8,
+	case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8,
 		reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
 		switch v.Kind() {
 		case t.Kind():
 			return true
 		case reflect.String:
-			val, err := strconv.ParseFloat(v.Interface().(string), 64)
+			val, err := strconv.ParseInt(v.Interface().(string), 10, 64)
 			if err != nil {
 				return false
 			}
 			*v = reflect.ValueOf(val).Convert(t)
-		case reflect.Float32, reflect.Float64:
-			*v = v.Convert(t)
-		case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8,
+		case reflect.Float32, reflect.Float64,
+			reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8,
 			reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
 			*v = v.Convert(t)
 		default:

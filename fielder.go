@@ -17,7 +17,7 @@ var (
 	}
 )
 
-type Fielder struct {
+type Fielder[T any] struct {
 	Schema any
 
 	Name     string
@@ -34,11 +34,11 @@ type Fielder struct {
 
 	SliceType,
 	MapKeyType,
-	MapValueType *Fielder
+	MapValueType *Fielder[any]
 
-	Children      map[string]*Fielder //
-	FieldsByIndex map[int]string      //
-	SuperIndex    *int                // if a field to a struct
+	Children      map[string]*Fielder[any] //
+	FieldsByIndex map[int]string           //
+	SuperIndex    *int                     // if a field to a struct
 
 	Walk         bool // default: true -> deep validation
 	Required     bool // default: false
@@ -49,7 +49,7 @@ type Fielder struct {
 	SkipValidate bool // default: false
 }
 
-func (f *Fielder) parseTags(tags map[string]string) {
+func (f *Fielder[T]) parseTags(tags map[string]string) {
 	f.Tags = tags
 
 	if v, ok := tags["name"]; ok && v != "" {
@@ -93,7 +93,7 @@ func (f *Fielder) parseTags(tags map[string]string) {
 	f.SkipError = ok && (strings.ToLower(v) == "true") && !f.Required
 }
 
-func (f *Fielder) parseRules() {
+func (f *Fielder[T]) parseRules() {
 	if f.Rules == nil {
 		f.Rules = map[string]*Rule{}
 	}
@@ -112,7 +112,7 @@ func (f *Fielder) parseRules() {
 	}
 }
 
-func (f *Fielder) ExecRules(sch reflect.Value) (reflect.Value, any) {
+func (f *Fielder[T]) ExecRules(sch reflect.Value) (reflect.Value, any) {
 	for _, r := range f.Rules {
 		if !r.Validate(sch, r.Value) {
 			err := ValidationError{
@@ -125,7 +125,7 @@ func (f *Fielder) ExecRules(sch reflect.Value) (reflect.Value, any) {
 	return sch, nil
 }
 
-func (f *Fielder) decodePrimitive(rv reflect.Value) (reflect.Value, any) {
+func (f *Fielder[T]) decodePrimitive(rv reflect.Value) (reflect.Value, any) {
 	if f.Type == reflect.Interface {
 		return rv, nil
 	}
@@ -141,7 +141,7 @@ func (f *Fielder) decodePrimitive(rv reflect.Value) (reflect.Value, any) {
 	return sch, nil
 }
 
-func (f *Fielder) decodeSlice(rv reflect.Value) (sch reflect.Value, err any) {
+func (f *Fielder[T]) decodeSlice(rv reflect.Value) (sch reflect.Value, err any) {
 
 	errs := []any{}
 	sliceOf := reflect.TypeOf(f.Schema)
@@ -200,7 +200,7 @@ func (f *Fielder) decodeSlice(rv reflect.Value) (sch reflect.Value, err any) {
 	return
 }
 
-func (f *Fielder) decodeMap(rv reflect.Value) (sch reflect.Value, err any) {
+func (f *Fielder[T]) decodeMap(rv reflect.Value) (sch reflect.Value, err any) {
 	if rv.Kind() == reflect.Pointer {
 		rv = rv.Elem()
 	}
@@ -235,7 +235,7 @@ func (f *Fielder) decodeMap(rv reflect.Value) (sch reflect.Value, err any) {
 	return
 }
 
-func (f *Fielder) decodeStruct(v any) (reflect.Value, any) {
+func (f *Fielder[T]) decodeStruct(v any) (reflect.Value, any) {
 	errs := []any{}
 	data, ok := v.(map[string]any)
 	if !ok {
@@ -334,7 +334,7 @@ func (f *Fielder) decodeStruct(v any) (reflect.Value, any) {
 	return sch, err
 }
 
-func (f *Fielder) decodeSchema(v any) (reflect.Value, any) {
+func (f *Fielder[T]) decodeSchema(v any) (reflect.Value, any) {
 	if v == "" && f.Type != reflect.String { // if v == a string (nil or null), v = nil
 		v = nil
 	}
@@ -383,13 +383,13 @@ func (f *Fielder) decodeSchema(v any) (reflect.Value, any) {
 	return f.ExecRules(sch.(reflect.Value))
 }
 
-func (f *Fielder) DecodeFromYaml(data any) Schema {
+func (f *Fielder[T]) DecodeFromYaml(data any) Schema[T] {
 	if d, ok := data.(string); ok {
 		if (f.Type == reflect.Map) || (f.Type == reflect.Struct) || (f.Type == reflect.Slice) {
 			var m any
 			err := yaml.Unmarshal([]byte(d), &m)
 			if err != nil {
-				return &schema{
+				return &schema[T]{
 					errors: []error{RetInvalidType(f)},
 				}
 			}
@@ -399,13 +399,13 @@ func (f *Fielder) DecodeFromYaml(data any) Schema {
 	return f.Decode(data)
 }
 
-func (f *Fielder) DecodeFromJson(data any) Schema {
+func (f *Fielder[T]) DecodeFromJson(data any) Schema[T] {
 	if d, ok := data.(string); ok {
 		if (f.Type == reflect.Map) || (f.Type == reflect.Struct) || (f.Type == reflect.Slice) {
 			var m any
 			err := json.Unmarshal([]byte(d), &m)
 			if err != nil {
-				return &schema{
+				return &schema[T]{
 					errors: []error{RetInvalidType(f)},
 				}
 			}
@@ -415,9 +415,9 @@ func (f *Fielder) DecodeFromJson(data any) Schema {
 	return f.Decode(data)
 }
 
-func (f *Fielder) Decode(data any) Schema {
+func (f *Fielder[T]) Decode(data any) Schema[T] {
 	sch, err := f.decodeSchema(data)
-	s := &schema{}
+	s := &schema[T]{}
 	if err != nil {
 		if e, ok := err.(error); ok {
 			s.errors = append(s.errors, e)
@@ -434,7 +434,7 @@ func (f *Fielder) Decode(data any) Schema {
 	return s
 }
 
-func (f *Fielder) New() reflect.Value {
+func (f *Fielder[T]) New() reflect.Value {
 	rs := reflect.ValueOf(f.Schema)
 
 	if f.IsSlice {
@@ -451,7 +451,7 @@ func (f *Fielder) New() reflect.Value {
 	return v
 }
 
-func (f *Fielder) ToMap() map[string]any {
+func (f *Fielder[T]) ToMap() map[string]any {
 	fieldMap := map[string]any{}
 	for t, v := range f.Tags {
 		if _, ok := _skipTag[t]; ok {
@@ -486,11 +486,11 @@ func (f *Fielder) ToMap() map[string]any {
 	return fieldMap
 }
 
-func (f *Fielder) CheckSchPtr(r reflect.Value) any {
+func (f *Fielder[T]) CheckSchPtr(r reflect.Value) T {
 	if f.IsPointer && (r.CanAddr() && r.Kind() != reflect.Pointer) {
-		return r.Addr().Interface()
+		return r.Addr().Interface().(T)
 	} else if !f.IsPointer && r.Kind() == reflect.Pointer {
-		return r.Elem().Interface()
+		return r.Elem().Interface().(T)
 	}
-	return r.Interface()
+	return r.Interface().(T)
 }

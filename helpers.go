@@ -41,7 +41,7 @@ func parseTags(tag string) map[string]string {
 	return kvTags
 }
 
-func RetMissing(f *Fielder) error {
+func RetMissing[T any](f *Fielder[T]) error {
 	v := &ValidationError{
 		Field: f.Name,
 		Rule:  rules["required"],
@@ -49,7 +49,7 @@ func RetMissing(f *Fielder) error {
 	return v
 }
 
-func RetInvalidType(f *Fielder) error {
+func RetInvalidType[T any](f *Fielder[T]) error {
 	v := &ValidationError{
 		Field: f.Name,
 		Rule: &Rule{
@@ -59,7 +59,7 @@ func RetInvalidType(f *Fielder) error {
 	return v
 }
 
-func RetInvalidValue(f *Fielder) error {
+func RetInvalidValue[T any](f *Fielder[T]) error {
 	v := &ValidationError{
 		Field: f.Name,
 		Rule: &Rule{

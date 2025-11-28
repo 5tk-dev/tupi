@@ -11,7 +11,7 @@ type Rule struct {
 	Value          string //
 	Message        string // ex.: {field} require a value >= 18
 	Validate       func(rv reflect.Value, rule string) bool
-	BeforeSetValue bool // exec after set value
+	BeforeSetValue bool // exec BEFORE set value
 }
 
 func (r *Rule) ToMap() map[string]any {

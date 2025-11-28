@@ -1,6 +1,6 @@
 package tupi
 
-func init() { initRegistry() }
+// func init() { initRegistry() }
 
 // use 'validate' in tags
 //
@@ -15,6 +15,6 @@ func init() { initRegistry() }
 //	} else {
 //		user := sch.Value().(*User)
 //	}
-func Validate(sch, data any) Schema {
-	return ParseSchemaWithTag("validate", sch).Decode(data)
+func Validate[T any](data any) Schema[T] {
+	return ParseSchemaWithTag[T]("validate").Decode(data)
 }

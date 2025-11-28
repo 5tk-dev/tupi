@@ -28,24 +28,32 @@ usage:
 		Field `tupi:"maxlength=100"`	// if a value can len, is valid. else skip
 	}
 */
-func ParseSchema(schema any) *Fielder {
-	return ParseSchemaWithTag("tupi", schema)
+func ParseSchema[T any](schema ...T) *Fielder[T] {
+	var sch T
+	if len(schema) > 0 {
+		sch = schema[0]
+	}
+	return ParseSchemaWithTag("tupi", sch)
 }
 
-func ParseSchemaWithTag(tagKey string, schema any) *Fielder {
+func ParseSchemaWithTag[T any](tagKey string, schema ...T) *Fielder[T] {
+	var sch T
+	if len(schema) > 0 {
+		sch = schema[0]
+	}
 	tags := map[string]string{}
-	if rn := reflect.TypeOf(schema).Name(); rn != "" {
+	if rn := reflect.TypeOf(sch).Name(); rn != "" {
 		tags["realName"] = rn
 	}
-	return parseSchema(schema, tagKey, tags)
+	return parseSchema[T](sch, tagKey, tags)
 }
 
-func parseSchema(schema any, tagKey string, tags map[string]string) *Fielder {
+func parseSchema[T any](schema any, tagKey string, tags map[string]string) *Fielder[T] {
 	if _, ok := tags["-"]; ok {
 		return nil
 	}
 	var (
-		f  = &Fielder{Schema: schema}
+		f  = &Fielder[T]{Schema: schema}
 		rv = reflect.ValueOf(schema)
 		rt reflect.Type
 	)
@@ -69,7 +77,7 @@ func parseSchema(schema any, tagKey string, tags map[string]string) *Fielder {
 
 	if schema != nil {
 		f.Type = rv.Kind()
-		f.Children = make(map[string]*Fielder)
+		f.Children = make(map[string]*Fielder[any])
 	}
 
 	if f.RealName == "" && f.Type != reflect.Interface {
@@ -103,7 +111,7 @@ func parseSchema(schema any, tagKey string, tags map[string]string) *Fielder {
 					fi = fv.Interface()
 				}
 
-				child := parseSchema(fi, tagKey, childTags)
+				child := parseSchema[any](fi, tagKey, childTags)
 				f.FieldsByIndex[i] = cname
 				if child != nil {
 					child.SuperIndex = &i
@@ -124,7 +132,7 @@ func parseSchema(schema any, tagKey string, tags map[string]string) *Fielder {
 			rvt = rvt.Elem()
 		}
 		sliceObjet := reflect.New(rvt).Elem()
-		f.SliceType = parseSchema(sliceObjet.Interface(), tagKey, map[string]string{"realName": ""})
+		f.SliceType = parseSchema[any](sliceObjet.Interface(), tagKey, map[string]string{"realName": ""})
 		f.SliceType.IsPointer = objIsPrt
 	case reflect.Map:
 		f.IsMAP = true
@@ -144,8 +152,8 @@ func parseSchema(schema any, tagKey string, tags map[string]string) *Fielder {
 			// mapValue = mapValue.Elem()
 		}
 
-		f.MapKeyType = parseSchema(mapKey.Interface(), tagKey, map[string]string{"realName": ""})
-		f.MapValueType = parseSchema(mapValue.Interface(), tagKey, map[string]string{"realName": ""})
+		f.MapKeyType = parseSchema[any](mapKey.Interface(), tagKey, map[string]string{"realName": ""})
+		f.MapValueType = parseSchema[any](mapValue.Interface(), tagKey, map[string]string{"realName": ""})
 
 		f.MapKeyType.IsPointer = keyIsPtr
 		f.MapValueType.IsPointer = valIsPtr

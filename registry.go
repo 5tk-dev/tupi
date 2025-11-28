@@ -1,49 +1,49 @@
 package tupi
 
-import (
-	"fmt"
-	"sync"
-)
+// import (
+// 	"fmt"
+// 	"sync"
+// )
 
-var (
-	once             sync.Once
-	muFielder        sync.RWMutex
-	fielderResgistry map[string]*Fielder
-)
+// var (
+// 	once             sync.Once
+// 	muFielder        sync.RWMutex
+// 	fielderResgistry map[*Fielder[any]]bool
+// )
 
-func initRegistry() {
-	once.Do(func() {
-		fielderResgistry = map[string]*Fielder{}
-	})
-}
+// func initRegistry() {
+// 	once.Do(func() {
+// 		fielderResgistry = map[*Fielder[any]]bool{}
+// 	})
+// }
 
-func RegisterFielder[T any](key string, schema *Fielder) error {
-	initRegistry()
+// func RegisterFielder[T any](key string, schema *Fielder[T]) error {
+// 	initRegistry()
 
-	muFielder.Lock()
-	defer muFielder.Unlock()
-	_, ok := fielderResgistry[key]
-	if ok {
-		return fmt.Errorf("fielder %q already registered", key)
-	}
-	fielderResgistry[key] = schema
-	return nil
-}
+// 	muFielder.Lock()
+// 	defer muFielder.Unlock()
+// 	_, ok := fielderResgistry[(*Fielder[any])(schema)]
+// 	if ok {
+// 		return fmt.Errorf("fielder %q already registered", key)
+// 	}
+// 	fielderResgistry[(*Fielder[any])(schema)] = true
+// 	return nil
+// }
 
-func GetFielder(key string) *Fielder {
-	muFielder.RLock()
-	defer muFielder.RUnlock()
-	return fielderResgistry[key]
-}
+// func GetFielder[T any]() *Fielder[T] {
+// 	muFielder.RLock()
+// 	defer muFielder.RUnlock()
+// 	return fielderResgistry[(*Fielder[T])]
+// }
 
-func ValidateSchema[T any](key string, data any) Schema {
-	f := GetFielder(key)
-	if f == nil {
-		return &schema{
-			errors: []error{
-				fmt.Errorf("fielder %q is undefined", key),
-			},
-		}
-	}
-	return f.Decode(data)
-}
+// func ValidateSchema[T any](key string, data any) Schema {
+// 	f := GetFielder(key)
+// 	if f == nil {
+// 		return &schema{
+// 			errors: []error{
+// 				fmt.Errorf("fielder %q is undefined", key),
+// 			},
+// 		}
+// 	}
+// 	return f.Decode(data)
+// }

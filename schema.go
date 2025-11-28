@@ -1,18 +1,18 @@
 package tupi
 
-type Schema interface {
-	Value() any
+type Schema[T any] interface {
+	Value() T
 	Errors() []error
 	HasErrors() bool
 }
 
-type schema struct {
-	val    any
+type schema[T any] struct {
+	val    T
 	errors []error
 }
 
-func (s *schema) Value() any { return s.val }
+func (s *schema[T]) Value() T { return s.val }
 
-func (s *schema) Errors() []error { return s.errors }
+func (s *schema[T]) Errors() []error { return s.errors }
 
-func (s *schema) HasErrors() bool { return len(s.errors) > 0 }
+func (s *schema[T]) HasErrors() bool { return len(s.errors) > 0 }
