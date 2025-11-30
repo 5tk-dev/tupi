@@ -7,10 +7,10 @@ import (
 )
 
 var (
-	fielderInt   = tupi.ParseSchema[int]() // alias int64
-	fielderInt8  = tupi.ParseSchema[int8]()
-	fielderInt16 = tupi.ParseSchema[int16]()
-	fielderInt32 = tupi.ParseSchema[int32]()
+	fielderInt   = tupi.Parse[int]() // alias int64
+	fielderInt8  = tupi.Parse[int8]()
+	fielderInt16 = tupi.Parse[int16]()
+	fielderInt32 = tupi.Parse[int32]()
 )
 
 // int.Decode(int) -> !Schema.hasError()
@@ -28,6 +28,7 @@ func TestIntegersWithInts(t *testing.T) {
 	vInt8 := schInt8.Value()
 	if vInt8 != 127 {
 		t.Errorf("got %v, want %v", vInt8, 127)
+		return
 	}
 
 	/* INT16 */
@@ -38,6 +39,7 @@ func TestIntegersWithInts(t *testing.T) {
 	vInt16 := schInt16.Value()
 	if vInt16 != 32767 {
 		t.Errorf("got %v, want %v", vInt16, 32767)
+		return
 	}
 
 	/* INT32 */
@@ -48,6 +50,7 @@ func TestIntegersWithInts(t *testing.T) {
 	vInt32 := schInt32.Value()
 	if vInt32 != 2147483647 {
 		t.Errorf("got %v, want %v", vInt32, 2147483647)
+		return
 	}
 
 	/* INT OR INT64 */
@@ -60,6 +63,7 @@ func TestIntegersWithInts(t *testing.T) {
 	vInt := schInt.Value()
 	if vInt != 9223372036854775807 {
 		t.Errorf("got %v, want %v", vInt, dataInt64)
+		return
 	}
 }
 
@@ -78,6 +82,7 @@ func TestIntegersWithStringInts(t *testing.T) {
 	vInt8 := schInt8.Value()
 	if vInt8 != 127 {
 		t.Errorf("got %v, want %v", vInt8, 127)
+		return
 	}
 
 	/* INT16 */
@@ -88,6 +93,7 @@ func TestIntegersWithStringInts(t *testing.T) {
 	vInt16 := schInt16.Value()
 	if vInt16 != 32767 {
 		t.Errorf("got %v, want %v", vInt16, 32767)
+		return
 	}
 
 	/* INT32 */
@@ -98,6 +104,7 @@ func TestIntegersWithStringInts(t *testing.T) {
 	vInt32 := schInt32.Value()
 	if vInt32 != 2147483647 {
 		t.Errorf("got %v, want %v", vInt32, 2147483647)
+		return
 	}
 
 	/* INT OR INT64 */
@@ -110,6 +117,7 @@ func TestIntegersWithStringInts(t *testing.T) {
 	vInt := schInt.Value()
 	if vInt != 9223372036854775807 {
 		t.Errorf("got %v, want %v", vInt, dataInt64)
+		return
 	}
 }
 
@@ -128,6 +136,7 @@ func TestIntegersWithFloats(t *testing.T) {
 	vInt8 := schInt8.Value()
 	if vInt8 != 127 {
 		t.Errorf("got %v, want %v", vInt8, 127)
+		return
 	}
 
 	/* INT16 */
@@ -138,6 +147,7 @@ func TestIntegersWithFloats(t *testing.T) {
 	vInt16 := schInt16.Value()
 	if vInt16 != 32767 {
 		t.Errorf("got %v, want %v", vInt16, 32767)
+		return
 	}
 
 	/* INT32 */
@@ -148,6 +158,7 @@ func TestIntegersWithFloats(t *testing.T) {
 	vInt32 := schInt32.Value()
 	if vInt32 != 2147483647 {
 		t.Errorf("got %v, want %v", vInt32, 2147483647)
+		return
 	}
 
 	/* INT OR INT64 */
@@ -160,6 +171,7 @@ func TestIntegersWithFloats(t *testing.T) {
 	vInt := schInt.Value()
 	if vInt != 8223372036854775808 {
 		t.Errorf("got %v, want %d", vInt, 8223372036854775808)
+		return
 	}
 }
 
@@ -168,18 +180,22 @@ func TestIntegersWithStringValues(t *testing.T) {
 	sch8 := fielderInt8.Decode("fdagaj156171")
 	if !sch8.HasErrors() {
 		t.Errorf("got %q, want %q", sch8.Value(), "error")
+		return
 	}
 	sch16 := fielderInt16.Decode("a")
 	if !sch16.HasErrors() {
 		t.Errorf("got %q, want %q", sch16.Value(), "error")
+		return
 	}
 	sch32 := fielderInt32.Decode("cdfc")
 	if !sch32.HasErrors() {
 		t.Errorf("got %q, want %q", sch32.Value(), "error")
+		return
 	}
 	sch64 := fielderInt.Decode("\t\t")
 	if !sch64.HasErrors() {
 		t.Errorf("got %q, want %q", sch64.Value(), "error")
+		return
 	}
 }
 
@@ -188,18 +204,22 @@ func TestIntegersWithBooleans0(t *testing.T) {
 	sch8 := fielderInt8.Decode(false)
 	if !sch8.HasErrors() {
 		t.Errorf("got %q, want %q", sch8.Value(), "error")
+		return
 	}
 	sch16 := fielderInt16.Decode(false)
 	if !sch16.HasErrors() {
 		t.Errorf("got %q, want %q", sch16.Value(), "error")
+		return
 	}
 	sch32 := fielderInt32.Decode(false)
 	if !sch32.HasErrors() {
 		t.Errorf("got %q, want %q", sch32.Value(), "error")
+		return
 	}
 	sch64 := fielderInt.Decode(false)
 	if !sch64.HasErrors() {
 		t.Errorf("got %q, want %q", sch64.Value(), "error")
+		return
 	}
 }
 
@@ -208,18 +228,22 @@ func TestIntegersWithBooleans1(t *testing.T) {
 	sch8 := fielderInt8.Decode(true)
 	if !sch8.HasErrors() {
 		t.Errorf("got %q, want %q", sch8.Value(), "error")
+		return
 	}
 	sch16 := fielderInt16.Decode(true)
 	if !sch16.HasErrors() {
 		t.Errorf("got %q, want %q", sch16.Value(), "error")
+		return
 	}
 	sch32 := fielderInt32.Decode(true)
 	if !sch32.HasErrors() {
 		t.Errorf("got %q, want %q", sch32.Value(), "error")
+		return
 	}
 	sch64 := fielderInt.Decode(true)
 	if !sch64.HasErrors() {
 		t.Errorf("got %q, want %q", sch64.Value(), "error")
+		return
 	}
 }
 
@@ -229,18 +253,22 @@ func TestIntegersWithStructs(t *testing.T) {
 	sch8 := fielderInt8.Decode(s)
 	if !sch8.HasErrors() {
 		t.Errorf("got %q, want %q", sch8.Value(), "error")
+		return
 	}
 	sch16 := fielderInt16.Decode(s)
 	if !sch16.HasErrors() {
 		t.Errorf("got %q, want %q", sch16.Value(), "error")
+		return
 	}
 	sch32 := fielderInt32.Decode(s)
 	if !sch32.HasErrors() {
 		t.Errorf("got %q, want %q", sch32.Value(), "error")
+		return
 	}
 	sch64 := fielderInt.Decode(s)
 	if !sch64.HasErrors() {
 		t.Errorf("got %q, want %q", sch64.Value(), "error")
+		return
 	}
 }
 
@@ -250,18 +278,22 @@ func TestIntegersWithMaps(t *testing.T) {
 	sch8 := fielderInt8.Decode(m)
 	if !sch8.HasErrors() {
 		t.Errorf("got %q, want %q", sch8.Value(), "error")
+		return
 	}
 	sch16 := fielderInt16.Decode(m)
 	if !sch16.HasErrors() {
 		t.Errorf("got %q, want %q", sch16.Value(), "error")
+		return
 	}
 	sch32 := fielderInt32.Decode(m)
 	if !sch32.HasErrors() {
 		t.Errorf("got %q, want %q", sch32.Value(), "error")
+		return
 	}
 	sch64 := fielderInt.Decode(m)
 	if !sch64.HasErrors() {
 		t.Errorf("got %q, want %q", sch64.Value(), "error")
+		return
 	}
 }
 
@@ -271,17 +303,21 @@ func TestIntegersWithFuncs(t *testing.T) {
 	sch8 := fielderInt8.Decode(f)
 	if !sch8.HasErrors() {
 		t.Errorf("got %q, want %q", sch8.Value(), "error")
+		return
 	}
 	sch16 := fielderInt16.Decode(f)
 	if !sch16.HasErrors() {
 		t.Errorf("got %q, want %q", sch16.Value(), "error")
+		return
 	}
 	sch32 := fielderInt32.Decode(f)
 	if !sch32.HasErrors() {
 		t.Errorf("got %q, want %q", sch32.Value(), "error")
+		return
 	}
 	sch64 := fielderInt.Decode(f)
 	if !sch64.HasErrors() {
 		t.Errorf("got %q, want %q", sch64.Value(), "error")
+		return
 	}
 }

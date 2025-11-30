@@ -75,8 +75,7 @@ func convert(v *reflect.Value, t reflect.Type) bool {
 func SetReflectValue(rcv reflect.Value, v reflect.Value) bool {
 	defer try()
 	if v.IsValid() {
-		c := convert(&v, rcv.Type())
-		if c {
+		if convert(&v, rcv.Type()) {
 			if rcv.Kind() == reflect.Pointer && v.Kind() != reflect.Pointer {
 				v = v.Addr()
 			} else if rcv.Kind() != reflect.Pointer && v.Kind() == reflect.Pointer {

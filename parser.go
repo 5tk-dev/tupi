@@ -8,86 +8,76 @@ import (
 /*
 usage:
 
-	tupi.ParseSchema(struct{}) => struct{}
-	tupi.ParseSchema(&struct{}) => *struct{}
-	tupi.ParseSchema(&struct{Field:Value}) => *struct{Field: value} // with default value
+	tupi.Parse(struct{}) => struct{}
+	tupi.Parse(&struct{}) => *struct{}
+	tupi.Parse(&struct{Field:Value}) => *struct{Field: value} // with default value
 
 	type Schema struct{
-		Field `tupi:"-"`				// omit this field
-		Field `tupi:"name"`				// string: name of validation		(default realName)
-		Field `tupi:"walk"`				// bool: deep validation			(default true)
-		Field `tupi:"escape"`			// bool: escape html value			(default false)
-		Field `tupi:"required"`			// bool:		...			 		(default false)
-		Field `tupi:"nullable"`			// bool: if true, allow nil value	(default true)
-		Field `tupi:"recursive"`		// bool: for embbed data 			(default false)
-		Field `tupi:"skiperr"`			// bool: omit on error				(default false)
-		Field `tupi:"skip"`				// bool: set value without validate	(default false)
-		Field `tupi:"min=18"`			// numbers only (int8, 16..., float32, ...)
-		Field `tupi:"max=65"`			// numbers only (int8, 16..., float32, ...)
-		Field `tupi:"minlength=1"`		// if a value can len, is valid. else skip
-		Field `tupi:"maxlength=100"`	// if a value can len, is valid. else skip
+		Field string	`validate:"-"`// omit this field
+		Field string	`validate:"name"` // string: name of validation	(default realName)
+		Field string	`validate:"escape"`	// bool: escape html value (default false)
+		Field string	`validate:"required"` // bool (default false)
+		Field string	`validate:"nullable"` // bool: if true, allow nil value	(default true)
+		Field Struct{}	`validate:"recursive"` // bool: for embbed data (default false)
+		Field any		`validate:"skiperr"` // bool: omit on error (default false)
+		Field any		`validate:"skip"` // bool: set value without validate	(default false)
+		Field int		`validate:"min=18"`	// numbers only (int8, 16..., float32, ...)
+		Field int		`validate:"max=65"`	// numbers only (int8, 16..., float32, ...)
+		Field string	`validate:"minlength=1"`// if a value can len, is valid. else skip
+		Field []string	`validate:"maxlength=100"`// if a value can len, is valid. else skip
+
+		Field string	`validate:"escape,minlen=6,maxlen=64"` // ex. many options
 	}
 */
-func ParseSchema[T any](schema ...T) *Fielder[T] {
+func Parse[T any](schema ...T) *Fielder[T] {
+	return ParseWithCustomTag("validate", schema...)
+}
+
+func ParseWithCustomTag[T any](tagKey string, schema ...T) *Fielder[T] {
 	var sch T
 	if len(schema) > 0 {
 		sch = schema[0]
 	}
-	return ParseSchemaWithTag("tupi", sch)
+	return parse(sch, tagKey, map[string]string{})
 }
 
-func ParseSchemaWithTag[T any](tagKey string, schema ...T) *Fielder[T] {
-	var sch T
-	if len(schema) > 0 {
-		sch = schema[0]
-	}
-	tags := map[string]string{}
-	if rn := reflect.TypeOf(sch).Name(); rn != "" {
-		tags["realName"] = rn
-	}
-	return parseSchema[T](sch, tagKey, tags)
-}
-
-func parseSchema[T any](schema any, tagKey string, tags map[string]string) *Fielder[T] {
+func parse[T any](schema T, tagKey string, tags map[string]string) *Fielder[T] {
 	if _, ok := tags["-"]; ok {
 		return nil
 	}
 	var (
-		f  = &Fielder[T]{Schema: schema}
+		f  = &Fielder[T]{schema: schema}
 		rv = reflect.ValueOf(schema)
-		rt reflect.Type
+		rt = reflect.TypeOf(schema)
 	)
-	f.RealName = tags["realName"]
 
-	f.parseTags(tags)
+	if rt.Kind() == reflect.Pointer {
+		f.isPointer = true
+		rt = rt.Elem()
+		rv = rv.Elem()
+	}
+
+	f.realName = tags["realName"]
+	f.tag = newTag(tags)
+	f.mapTags = tags
 	f.parseRules()
 
-	if schema != nil {
-		rt = rv.Type()
-	} else {
-		rt = reflect.TypeOf(nil)
-		f.Type = reflect.Interface
+	if !rv.IsValid() {
+		rv = reflect.New(rt).Elem()
 	}
 
-	if rv.Kind() == reflect.Pointer {
-		f.IsPointer = true
-		rv = rv.Elem()
-		rt = rt.Elem()
+	f.reflecKind = rt.Kind()
+	f.reflecType = rt
+	f.children = make(map[string]*Fielder[any])
+
+	if f.realName == "" && f.reflecKind != reflect.Interface {
+		f.realName = rt.Name()
 	}
 
-	if schema != nil {
-		f.Type = rv.Kind()
-		f.Children = make(map[string]*Fielder[any])
-	}
-
-	if f.RealName == "" && f.Type != reflect.Interface {
-		f.RealName = rt.Name()
-	}
-
-	switch f.Type {
+	switch f.reflecKind {
 	case reflect.Struct:
-		f.IsStruct = true
-		f.FieldsByIndex = map[int]string{}
+		f.isStruct = true
+		f.fieldsByIndex = map[int]string{}
 		for i := 0; i < rt.NumField(); i++ {
 			fv := rv.Field(i)
 			if fv.CanInterface() {
@@ -111,31 +101,31 @@ func parseSchema[T any](schema any, tagKey string, tags map[string]string) *Fiel
 					fi = fv.Interface()
 				}
 
-				child := parseSchema[any](fi, tagKey, childTags)
-				f.FieldsByIndex[i] = cname
+				child := parse(fi, tagKey, childTags)
+				f.fieldsByIndex[i] = cname
 				if child != nil {
-					child.SuperIndex = &i
-					f.Children[cname] = child
-					if v, ok := childTags["heritage"]; ok && strings.ToLower(v) == "true" {
-						child.Recurcive = true
+					child.superIndex = &i
+					f.children[cname] = child
+					if v, ok := childTags["recursive"]; ok && strings.ToLower(v) == "true" {
+						child.recursive = true
 					}
 				}
 			}
 		}
 	case reflect.Slice, reflect.Array:
 		objIsPrt := false
-		f.Type = rt.Kind()
-		f.IsSlice = true
+		f.reflecKind = rt.Kind()
+		f.isSlice = true
 		rvt := rv.Type().Elem()
 		if rvt.Kind() == reflect.Pointer {
 			objIsPrt = true
 			rvt = rvt.Elem()
 		}
 		sliceObjet := reflect.New(rvt).Elem()
-		f.SliceType = parseSchema[any](sliceObjet.Interface(), tagKey, map[string]string{"realName": ""})
-		f.SliceType.IsPointer = objIsPrt
+		f.sliceType = parse[any](sliceObjet.Interface(), tagKey, map[string]string{"realName": ""})
+		f.sliceType.isPointer = objIsPrt
 	case reflect.Map:
-		f.IsMAP = true
+		f.isMAP = true
 
 		keyIsPtr := false
 		valIsPtr := false
@@ -149,20 +139,20 @@ func parseSchema[T any](schema any, tagKey string, tags map[string]string) *Fiel
 
 		if mapValue.Kind() == reflect.Pointer {
 			valIsPtr = true
-			// mapValue = mapValue.Elem()
 		}
 
-		f.MapKeyType = parseSchema[any](mapKey.Interface(), tagKey, map[string]string{"realName": ""})
-		f.MapValueType = parseSchema[any](mapValue.Interface(), tagKey, map[string]string{"realName": ""})
+		f.mapKeyType = parse(mapKey.Interface(), tagKey, map[string]string{"realName": ""})
+		f.mapValueType = parse(mapValue.Interface(), tagKey, map[string]string{"realName": ""})
 
-		f.MapKeyType.IsPointer = keyIsPtr
-		f.MapValueType.IsPointer = valIsPtr
+		f.mapKeyType.isPointer = keyIsPtr
+		f.mapValueType.isPointer = valIsPtr
 	}
 	if rv.IsValid() {
 		if rv.CanInterface() && !rv.IsZero() {
-			f.Default = schema
+			f.defaultValue = schema
+			f.required = false
 		}
 	}
-
+	f.parsed = true
 	return f
 }

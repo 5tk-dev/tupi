@@ -11,8 +11,6 @@ type schema[T any] struct {
 	errors []error
 }
 
-func (s *schema[T]) Value() T { return s.val }
-
+func (s *schema[T]) Value() T        { return s.val }
 func (s *schema[T]) Errors() []error { return s.errors }
-
 func (s *schema[T]) HasErrors() bool { return len(s.errors) > 0 }

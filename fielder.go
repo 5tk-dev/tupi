@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 
 	yaml "gopkg.in/yaml.v3"
 )
@@ -18,124 +17,94 @@ var (
 )
 
 type Fielder[T any] struct {
-	Schema any
+	*tag
+	schema T
 
-	Name     string
-	Type     reflect.Kind
-	Tags     map[string]string
-	Default  any
-	RealName string
-	Rules    map[string]*Rule
+	name         string
+	rules        map[string]*Rule
+	mapTags      map[string]string
+	realName     string
+	defaultValue any
 
-	IsMAP,
-	IsSlice,
-	IsStruct,
-	IsPointer bool
+	reflecKind reflect.Kind
+	reflecType reflect.Type
 
-	SliceType,
-	MapKeyType,
-	MapValueType *Fielder[any]
+	isMAP,
+	isSlice,
+	isStruct,
+	isPointer bool
 
-	Children      map[string]*Fielder[any] //
-	FieldsByIndex map[int]string           //
-	SuperIndex    *int                     // if a field to a struct
+	sliceType,
+	mapKeyType,
+	mapValueType *Fielder[any]
 
-	Walk         bool // default: true -> deep validation
-	Required     bool // default: false
-	Nullable     bool // default: true
-	Recurcive    bool // default: false -> for embed struct
-	SkipError    bool // default: false
-	OmitEmpty    bool // default: false
-	SkipValidate bool // default: false
-}
+	children      map[string]*Fielder[any] //
+	fieldsByIndex map[int]string           //
+	superIndex    *int                     // if a field to a struct
 
-func (f *Fielder[T]) parseTags(tags map[string]string) {
-	f.Tags = tags
-
-	if v, ok := tags["name"]; ok && v != "" {
-		f.Name = v
-	} else {
-		f.Name = f.RealName
-	}
-
-	if r, ok := tags["recursive"]; ok {
-		f.Recurcive = r != "false"
-	}
-
-	v, ok := tags["walk"] // default true
-	f.Walk = !ok || strings.ToLower(v) != "false"
-
-	v, ok = tags["skip"] // default false
-	f.SkipValidate = ok && (strings.ToLower(v) != "false")
-
-	v, ok = tags["required"] // default false
-	f.Required = ok && (strings.ToLower(v) == "true")
-
-	_, ok = tags["min"] // default false
-	if ok {
-		f.Required = ok
-	}
-
-	v, ok = tags["nullable"] // default true
-	if ok {
-		if strings.ToLower(v) == "false" {
-			f.Required = true
-		} else {
-			f.Nullable = true
-		}
-	}
-
-	if f.Nullable && f.Required {
-		f.Nullable = false
-	}
-
-	v, ok = tags["skiperr"] // skip field on err - default false
-	f.SkipError = ok && (strings.ToLower(v) == "true") && !f.Required
+	/*
+		this permit the use:
+			var fielder = &tupi.Fielder[*Foo]{}
+			sch := fielder.DecodeFromJson(`{"foo":"bar"}`)
+	*/
+	parsed bool
 }
 
 func (f *Fielder[T]) parseRules() {
-	if f.Rules == nil {
-		f.Rules = map[string]*Rule{}
+	if f.rules == nil {
+		f.rules = map[string]*Rule{}
 	}
-	for rn, v := range f.Tags {
+	for rn, v := range f.mapTags {
 		if r := GetRule(rn); r != nil {
 			nr := &Rule{
 				Name:     r.Name,
+				Value:    v,
 				Message:  r.Message,
 				Validate: r.Validate,
 			}
-			if r.Value == "" {
-				nr.Value = v
+			f.rules[rn] = nr
+			switch r.Name {
+			case "min", "max", "minlen", "maxlen":
+				f.required = true
+				f.nullable = false
 			}
-			f.Rules[rn] = nr
 		}
 	}
 }
 
-func (f *Fielder[T]) ExecRules(sch reflect.Value) (reflect.Value, any) {
-	for _, r := range f.Rules {
+func (f *Fielder[T]) checkSchPtr(r reflect.Value) T {
+	if f.isPointer && (r.CanAddr() && r.Kind() != reflect.Pointer) {
+		return r.Addr().Interface().(T)
+	} else if !f.isPointer && r.Kind() == reflect.Pointer {
+		return r.Elem().Interface().(T)
+	}
+	return r.Interface().(T)
+}
+
+func (f *Fielder[T]) execRules(sch reflect.Value) (reflect.Value, error) {
+	for _, r := range f.rules {
 		if !r.Validate(sch, r.Value) {
-			err := ValidationError{
+			return reflect.Value{}, ValidationError{
 				Rule:  r,
-				Field: f.Name,
+				Field: f.name,
 			}
-			return reflect.Value{}, err
+
 		}
 	}
 	return sch, nil
 }
 
 func (f *Fielder[T]) decodePrimitive(rv reflect.Value) (reflect.Value, any) {
-	if f.Type == reflect.Interface {
+	if f.reflecKind == reflect.Interface {
 		return rv, nil
 	}
 	sch := f.New()
 	if !SetReflectValue(sch, rv) {
-		if !f.SkipError {
+		if !f.skipError {
 			return reflect.Value{}, RetInvalidType(f)
 		}
 	}
-	if f.IsPointer && sch.CanAddr() {
+	if f.isPointer && sch.CanAddr() {
 		return sch.Addr(), nil
 	}
 	return sch, nil
@@ -144,10 +113,10 @@ func (f *Fielder[T]) decodePrimitive(rv reflect.Value) (reflect.Value, any) {
 func (f *Fielder[T]) decodeSlice(rv reflect.Value) (sch reflect.Value, err any) {
 
 	errs := []any{}
-	sliceOf := reflect.TypeOf(f.Schema)
+	sliceOf := reflect.TypeOf(f.schema)
 	lenSlice := rv.Len()
 
-	if f.IsPointer {
+	if f.isPointer {
 		sch = reflect.MakeSlice(sliceOf.Elem(), lenSlice, rv.Cap())
 	} else {
 		sch = reflect.MakeSlice(sliceOf, lenSlice, rv.Cap())
@@ -156,24 +125,19 @@ func (f *Fielder[T]) decodeSlice(rv reflect.Value) (sch reflect.Value, err any) 
 	for i := range lenSlice {
 		var (
 			is       = rv.Index(i)
-			sf       = f.SliceType
+			sf       = f.sliceType
 			err      any
 			sliceSch reflect.Value
 		)
 
-		if f.Walk {
-			sliceSch, err = sf.decodeSchema(is.Interface())
-		} else {
-			sliceSch = is
-		}
-
+		sliceSch, err = sf.decodeSchema(is.Interface())
 		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
 
 		schIndex := sch.Index(i)
-		if f.SliceType.IsPointer {
+		if f.sliceType.isPointer {
 			if sliceSch.Kind() != reflect.Ptr && sliceSch.CanAddr() {
 				sliceSch = sliceSch.Addr()
 			}
@@ -186,7 +150,7 @@ func (f *Fielder[T]) decodeSlice(rv reflect.Value) (sch reflect.Value, err any) 
 	}
 
 	if sch.Len() == 0 {
-		if f.Required {
+		if f.required {
 			errs = append(errs, RetMissing(f))
 		}
 	}
@@ -205,28 +169,28 @@ func (f *Fielder[T]) decodeMap(rv reflect.Value) (sch reflect.Value, err any) {
 		rv = rv.Elem()
 	}
 	if !rv.IsValid() {
-		err = map[string]any{f.Name: RetInvalidType(f)}
+		err = map[string]any{f.name: RetInvalidType(f)}
 		return
 	}
-	mt := reflect.TypeOf(f.Schema)
+	mt := reflect.TypeOf(f.schema)
 	m := reflect.MakeMap(mt)
 	for _, key := range rv.MapKeys() {
 		mindex := rv.MapIndex(key)
 
-		mkey, _err := f.MapKeyType.decodeSchema(key.Interface())
+		mkey, _err := f.mapKeyType.decodeSchema(key.Interface())
 		if _err != nil {
 			err = _err
 			return
 		}
-		mval, _err := f.MapValueType.decodeSchema(mindex.Interface())
+		mval, _err := f.mapValueType.decodeSchema(mindex.Interface())
 		if _err != nil {
 			err = _err
 			return
 		}
-		if f.MapValueType.IsPointer && mval.CanAddr() {
+		if f.mapValueType.isPointer && mval.CanAddr() {
 			mval = mval.Addr()
 		}
-		if f.MapKeyType.IsPointer && mkey.CanAddr() {
+		if f.mapKeyType.isPointer && mkey.CanAddr() {
 			mkey = mkey.Addr()
 		}
 		m.SetMapIndex(mkey, mval)
@@ -237,26 +201,33 @@ func (f *Fielder[T]) decodeMap(rv reflect.Value) (sch reflect.Value, err any) {
 
 func (f *Fielder[T]) decodeStruct(v any) (reflect.Value, any) {
 	errs := []any{}
-	data, ok := v.(map[string]any)
-	if !ok {
-		_data, err := EncodeStruct(v)
-		if err != nil {
-			return reflect.Value{}, RetInvalidType(f)
-		}
+	var data map[string]any
 
-		data, ok = _data.(map[string]any)
-		if !ok {
-			if d, ok := _data.(map[any]any); ok {
-				data = map[string]any{}
-				for k, v := range d {
-					data[fmt.Sprint(k)] = v
-				}
-			} else if f.SkipError {
+	rvData := reflect.ValueOf(v)
+	if rvData.Kind() == reflect.Pointer {
+		if _rvData := rvData.Elem(); _rvData.Kind() != reflect.Invalid {
+			rvData = _rvData
+		}
+	}
+	switch rvData.Kind() {
+	case reflect.Map, reflect.Struct:
+		_d, err := EncodeStruct(v)
+		if err != nil {
+			if f.skipError {
 				return f.New(), nil
 			} else {
 				return reflect.Value{}, RetInvalidType(f)
 			}
 		}
+		_data, ok := _d.(map[string]any)
+		if !ok {
+			if f.skipError {
+				return f.New(), nil
+			} else {
+				return reflect.Value{}, RetInvalidType(f)
+			}
+		}
+		data = _data
 	}
 
 	sch := f.New()
@@ -268,60 +239,62 @@ func (f *Fielder[T]) decodeStruct(v any) (reflect.Value, any) {
 		}
 
 		var value any
-		fName := f.FieldsByIndex[i]
-		fielder, ok := f.Children[fName]
+		fName := f.fieldsByIndex[i]
+		fielder, ok := f.children[fName]
 		if !ok {
 			continue
 		}
 
-		if fielder.Recurcive {
+		if fielder.recursive {
 			value = data
 		} else {
-			fn := fName
-			if value, ok = data[fn]; !ok {
-				if fielder.Default != nil {
-					value = fielder.Default
+			if value, ok = data[fName]; !ok {
+				if fielder.defaultValue != nil {
+					value = fielder.defaultValue
 				}
 			}
-
-			if value == nil && !fielder.Nullable {
-				if fielder.Required {
-					errs = append(errs, RetMissing(fielder))
+			if value == nil {
+				if !fielder.nullable {
+					if fielder.required {
+						errs = append(errs, RetMissing(fielder))
+					}
 				}
-				fielder.ExecRules(schF)
 				continue
 			}
+		}
+
+		if value == nil && fielder.nullable {
+			continue
 		}
 
 		var rvF reflect.Value
 		var err any
 
-		if fielder.SkipValidate {
+		if fielder.skipValidate {
 			SetReflectValue(schF,
 				reflect.ValueOf(value))
 			continue
 		}
 
-		if fielder.Walk {
-			if rvF, err = fielder.decodeSchema(value); err != nil {
-				errs = append(errs, err)
-				continue
-			}
-		} else {
-			rvF = reflect.ValueOf(value)
+		if rvF, err = fielder.decodeSchema(value); err != nil {
+			errs = append(errs, err)
+			continue
 		}
 
 		if rvF.Kind() == reflect.Invalid {
-			if fielder.Nullable {
+			if fielder.nullable {
 				continue
-			} else if !fielder.SkipError {
-				errs = append(errs, map[string]any{fielder.Name: RetInvalidType(fielder)})
+			} else if !fielder.skipError {
+				errs = append(errs, map[string]any{fielder.name: RetInvalidType(fielder)})
 			}
 		} else if !SetReflectValue(schF, rvF) {
-			if !fielder.SkipError {
+			if !fielder.skipError {
 				errs = append(errs, RetInvalidType(fielder))
 			}
 			continue
+		}
+		if _, ruleErrs := fielder.execRules(schF); ruleErrs != nil {
+			errs = append(errs, ruleErrs)
 		}
 	}
 	var err any
@@ -335,38 +308,38 @@ func (f *Fielder[T]) decodeStruct(v any) (reflect.Value, any) {
 }
 
 func (f *Fielder[T]) decodeSchema(v any) (reflect.Value, any) {
-	if v == "" && f.Type != reflect.String { // if v == a string (nil or null), v = nil
+	if v == "" && f.reflecKind != reflect.String { // if v == a string: (nil or null), v = nil
 		v = nil
 	}
 	var (
-		rfVal = reflect.ValueOf(v)
-		sch   any
-		err   any
+		sch reflect.Value
+		err any
 	)
 
 	if v == nil {
-		if f.Default != nil {
-			sch, err = f.decodeSchema(f.Default)
-		} else if f.Required {
+		if f.defaultValue != nil {
+			sch, err = f.decodeSchema(f.defaultValue)
+		} else if f.required {
 			errs := map[string]any{}
-			if len(f.Children) > 0 {
-				for _, c := range f.Children {
-					if c.Required {
-						errs[c.Name] = RetMissing(c)
+			if len(f.children) > 0 {
+				for _, c := range f.children {
+					if c.required {
+						errs[c.name] = RetMissing(c)
 					}
 				}
 				return reflect.Value{}, errs
 			} else {
 				return reflect.Value{}, map[string]any{
-					f.Name: RetMissing(f),
+					f.name: RetMissing(f),
 				}
 			}
-		} else if f.Nullable {
-			return f.ExecRules(reflect.ValueOf(nil))
+		} else if f.nullable {
+			sch, err = f.execRules(reflect.ValueOf(nil))
 		}
 	}
 	if err == nil {
-		switch f.Type {
+		rfVal := reflect.ValueOf(v)
+		switch f.reflecKind {
 		default:
 			sch, err = f.decodePrimitive(rfVal)
 		case reflect.Map:
@@ -380,12 +353,38 @@ func (f *Fielder[T]) decodeSchema(v any) (reflect.Value, any) {
 	if err != nil {
 		return reflect.Value{}, err
 	}
-	return f.ExecRules(sch.(reflect.Value))
+	return f.execRules(sch)
+}
+
+/*
+	Decode
+*/
+
+func (f *Fielder[T]) Decode(data any) Schema[T] {
+	if !f.parsed {
+		*f = *parse(*new(T), "validate", map[string]string{})
+	}
+	sch, err := f.decodeSchema(data)
+	s := &schema[T]{}
+	if err != nil {
+		if e, ok := err.(error); ok {
+			s.errors = append(s.errors, e)
+			return s
+		}
+		if str, ok := err.(string); ok {
+			s.errors = append(s.errors, errors.New(str))
+			return s
+		}
+		s.errors = append(s.errors, errors.New(fmt.Sprint(err)))
+		return s
+	}
+	s.val = f.checkSchPtr(sch)
+	return s
 }
 
 func (f *Fielder[T]) DecodeFromYaml(data any) Schema[T] {
 	if d, ok := data.(string); ok {
-		if (f.Type == reflect.Map) || (f.Type == reflect.Struct) || (f.Type == reflect.Slice) {
+		if (f.reflecKind == reflect.Map) || (f.reflecKind == reflect.Struct) || (f.reflecKind == reflect.Slice) {
 			var m any
 			err := yaml.Unmarshal([]byte(d), &m)
 			if err != nil {
@@ -401,7 +400,7 @@ func (f *Fielder[T]) DecodeFromYaml(data any) Schema[T] {
 
 func (f *Fielder[T]) DecodeFromJson(data any) Schema[T] {
 	if d, ok := data.(string); ok {
-		if (f.Type == reflect.Map) || (f.Type == reflect.Struct) || (f.Type == reflect.Slice) {
+		if (f.reflecKind == reflect.Map) || (f.reflecKind == reflect.Struct) || (f.reflecKind == reflect.Slice) {
 			var m any
 			err := json.Unmarshal([]byte(d), &m)
 			if err != nil {
@@ -415,30 +414,15 @@ func (f *Fielder[T]) DecodeFromJson(data any) Schema[T] {
 	return f.Decode(data)
 }
 
-func (f *Fielder[T]) Decode(data any) Schema[T] {
-	sch, err := f.decodeSchema(data)
-	s := &schema[T]{}
-	if err != nil {
-		if e, ok := err.(error); ok {
-			s.errors = append(s.errors, e)
-			return s
-		}
-		if str, ok := err.(string); ok {
-			s.errors = append(s.errors, errors.New(str))
-			return s
-		}
-		s.errors = append(s.errors, errors.New(fmt.Sprint(err)))
-		return s
-	}
-	s.val = f.CheckSchPtr(sch)
-	return s
-}
+/*
+	Utils
+*/
 
 func (f *Fielder[T]) New() reflect.Value {
-	rs := reflect.ValueOf(f.Schema)
+	rs := reflect.ValueOf(f.schema)
 
-	if f.IsSlice {
-		t := reflect.TypeOf(f.SliceType.Schema)
+	if f.isSlice {
+		t := reflect.TypeOf(f.sliceType.schema)
 		t = reflect.SliceOf(t)
 		rs = reflect.MakeSlice(t, 0, 0)
 	}
@@ -453,44 +437,35 @@ func (f *Fielder[T]) New() reflect.Value {
 
 func (f *Fielder[T]) ToMap() map[string]any {
 	fieldMap := map[string]any{}
-	for t, v := range f.Tags {
+	for t, v := range f.mapTags {
 		if _, ok := _skipTag[t]; ok {
 			continue
 		}
 		fieldMap[t] = v
 	}
 
-	st := f.Tags["strType"]
+	st := f.mapTags["strType"]
 	if st == "" {
-		st = f.Type.String()
+		st = f.reflecKind.String()
 	}
 
 	if st != "struct" {
 		fieldMap["type"] = st
 	}
 
-	if len(f.Children) > 0 {
-		for cn, cv := range f.Children {
+	if len(f.children) > 0 {
+		for cn, cv := range f.children {
 			fieldMap[cn] = cv.ToMap()
 		}
-	} else if f.IsSlice {
-		fieldMap["fields"] = f.SliceType.ToMap()
+	} else if f.isSlice {
+		fieldMap["fields"] = f.sliceType.ToMap()
 	}
 
 	mapRules := []map[string]any{}
-	for _, r := range f.Rules {
+	for _, r := range f.rules {
 		mapRules = append(mapRules, r.ToMap())
 	}
 	fieldMap["rules"] = mapRules
 
 	return fieldMap
-}
-
-func (f *Fielder[T]) CheckSchPtr(r reflect.Value) T {
-	if f.IsPointer && (r.CanAddr() && r.Kind() != reflect.Pointer) {
-		return r.Addr().Interface().(T)
-	} else if !f.IsPointer && r.Kind() == reflect.Pointer {
-		return r.Elem().Interface().(T)
-	}
-	return r.Interface().(T)
 }

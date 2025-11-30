@@ -43,7 +43,7 @@ func parseTags(tag string) map[string]string {
 
 func RetMissing[T any](f *Fielder[T]) error {
 	v := &ValidationError{
-		Field: f.Name,
+		Field: f.name,
 		Rule:  rules["required"],
 	}
 	return v
@@ -51,9 +51,9 @@ func RetMissing[T any](f *Fielder[T]) error {
 
 func RetInvalidType[T any](f *Fielder[T]) error {
 	v := &ValidationError{
-		Field: f.Name,
+		Field: f.name,
 		Rule: &Rule{
-			Message: fmt.Sprintf("{field} require a type: %s", f.Type),
+			Message: fmt.Sprintf("{field} require a type: %s", f.reflecKind),
 		},
 	}
 	return v
@@ -61,7 +61,7 @@ func RetInvalidType[T any](f *Fielder[T]) error {
 
 func RetInvalidValue[T any](f *Fielder[T]) error {
 	v := &ValidationError{
-		Field: f.Name,
+		Field: f.name,
 		Rule: &Rule{
 			Message: "{field} require a value",
 		},

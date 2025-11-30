@@ -1,6 +1,9 @@
 package tupi
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 func EncodeStruct(v any) (any, error) {
 	j, err := json.Marshal(v)
@@ -12,6 +15,9 @@ func EncodeStruct(v any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return data, nil
-
+	newData := map[string]any{}
+	for k, v := range data {
+		newData[strings.ToLower(k)] = v
+	}
+	return newData, nil
 }

@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	fielderFloat32 = tupi.ParseSchema[float32]()
-	fielderFloat64 = tupi.ParseSchema[float64]()
+	fielderFloat32 = &tupi.Fielder[float32]{}
+	fielderFloat64 = &tupi.Fielder[float64]{}
 )
 
 func TestFloatsWithFloats(t *testing.T) {
@@ -16,19 +16,23 @@ func TestFloatsWithFloats(t *testing.T) {
 	sch32 := fielderFloat32.Decode(data64)
 	if sch32.HasErrors() {
 		t.Error(sch32.Errors())
+		return
 	}
 	v32 := sch32.Value()
 	if v32 != float32(data64) {
 		t.Errorf("got %v, want %v", v32, data64)
+		return
 	}
 
 	sch64 := fielderFloat64.Decode(data64)
 	if sch64.HasErrors() {
 		t.Error(sch64.Errors())
+		return
 	}
 	v64 := sch64.Value()
 	if v64 != 1.9223372036854775807 {
 		t.Errorf("got %v, want %v", v64, data64)
+		return
 	}
 
 }
@@ -39,25 +43,29 @@ func TestFloatsWithInts(t *testing.T) {
 	sch32 := fielderFloat32.Decode(data64)
 	if sch32.HasErrors() {
 		t.Error(sch32.Errors())
+		return
 	}
 	v32 := sch32.Value()
 	if v32 != float32(data64) {
 		t.Errorf("got %v, want %v", v32, float32(data64))
+		return
 	}
 
 	sch64 := fielderFloat64.Decode(data64)
 	if sch64.HasErrors() {
 		t.Error(sch64.Errors())
+		return
 	}
 	v64 := sch64.Value()
 	if v64 != float64(data64) {
 		t.Errorf("got %v, want %v", v64, (float64(data64)))
+		return
 	}
 }
 
 // floats.Decode("int") -> !Schema.hasError()
 func TestFloatsWithStringInts(t *testing.T) {
-
+	fielderFloat32.New()
 	data64 := "214748365"
 	sch32 := fielderFloat32.Decode(data64)
 	if sch32.HasErrors() {
@@ -66,6 +74,7 @@ func TestFloatsWithStringInts(t *testing.T) {
 	v32 := sch32.Value()
 	if v32 != float32(214748365) {
 		t.Errorf("got %v, want %v", v32, data64)
+		return
 	}
 
 	sch64 := fielderFloat64.Decode(data64)
@@ -75,6 +84,7 @@ func TestFloatsWithStringInts(t *testing.T) {
 	v64 := sch64.Value()
 	if v64 != float64(214748365) {
 		t.Errorf("got %v, want %v", v64, data64)
+		return
 	}
 }
 
@@ -83,11 +93,13 @@ func TestFloatsWithStringValues(t *testing.T) {
 	sch := fielderFloat32.Decode("\t\t")
 	if !sch.HasErrors() {
 		t.Errorf("got %v, want %q", sch.Value(), "error")
+		return
 	}
 
 	sch64 := fielderFloat64.Decode("\r\n")
 	if !sch64.HasErrors() {
 		t.Errorf("got %v, want %q", sch64.Value(), "error")
+		return
 	}
 }
 
@@ -96,11 +108,13 @@ func TestFloatsWithBooleans(t *testing.T) {
 	sch32 := fielderFloat32.Decode(false)
 	if !sch32.HasErrors() {
 		t.Errorf("got %v, want %q", sch32.Value(), "error")
+		return
 	}
 
 	sch64 := fielderFloat64.Decode(false)
 	if !sch64.HasErrors() {
 		t.Errorf("got %v, want %q", sch64.Value(), "error")
+		return
 	}
 }
 
@@ -109,10 +123,12 @@ func TestFloatsWithBooleans1(t *testing.T) {
 	sch32 := fielderFloat32.Decode(true)
 	if !sch32.HasErrors() {
 		t.Errorf("got %v, want %q", sch32.Value(), "error")
+		return
 	}
 	sch64 := fielderFloat64.Decode(true)
 	if !sch64.HasErrors() {
 		t.Errorf("got %v, want %q", sch64.Value(), "error")
+		return
 	}
 }
 
@@ -122,11 +138,13 @@ func TestFloatsWithStructs(t *testing.T) {
 	sch32 := fielderFloat32.Decode(s)
 	if !sch32.HasErrors() {
 		t.Errorf("got %v, want %q", sch32.Value(), "error")
+		return
 	}
 
 	sch64 := fielderFloat64.Decode(s)
 	if !sch64.HasErrors() {
 		t.Errorf("got %v, want %q", sch64.Value(), "error")
+		return
 	}
 }
 
@@ -136,10 +154,12 @@ func TestFloatsWithMaps(t *testing.T) {
 	sch32 := fielderFloat32.Decode(m)
 	if !sch32.HasErrors() {
 		t.Errorf("got %v, want %q", sch32.Value(), "error")
+		return
 	}
 	sch64 := fielderFloat32.Decode(m)
 	if !sch64.HasErrors() {
 		t.Errorf("got %v, want %q", sch64.Value(), "error")
+		return
 	}
 }
 
@@ -149,9 +169,11 @@ func TestFloatsWithFuncs(t *testing.T) {
 	sch32 := fielderFloat32.Decode(f)
 	if !sch32.HasErrors() {
 		t.Errorf("got %v, want %q", sch32.Value(), "error")
+		return
 	}
 	sch := fielderFloat64.Decode(f)
 	if !sch.HasErrors() {
 		t.Errorf("got %v, want %q", sch.Value(), "error")
+		return
 	}
 }

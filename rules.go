@@ -23,8 +23,8 @@ func (r *Rule) ToMap() map[string]any {
 }
 
 var defaultRules = map[string]bool{
-	"":         true,
-	"required": true,
+	"":         true, // não pode sobrepor
+	"required": true, // ''   ''    ''
 }
 
 var (
